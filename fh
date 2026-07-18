@@ -1,0 +1,78 @@
+local PainterLib = {}
+local HttpService = game:GetService("HttpService")
+local run = game:GetService("RunService")
+local p = game:GetService("Players")
+local Player = p.LocalPlayer
+
+function PainterLib.GetBlocks()
+    local Blocks = {}
+    local MyAircraft = workspace.PIayerAircraft:FindFirstChild(Player.Name)
+    if MyAircraft then
+        for _, F2 in pairs(MyAircraft:GetChildren()) do
+            if F2:IsA("Model") and F2.Name == "BlockStd" then
+                local BK = F2:FindFirstChild("BlockStd")
+                if BK then table.insert(Blocks, BK) end
+            end
+        end
+    end
+    return Blocks
+end
+
+function PainterLib.PaintSolid(ActiveRemote, ColorName, R, G, B, StatusCallback)
+    if not ActiveRemote then StatusCallback("X Not connected", Color3.fromRGB(255,120,120)) return end
+    StatusCallback("" .. ColorName .. "...")
+    
+    local Blocks = PainterLib.GetBlocks()
+    if #Blocks == 0 then StatusCallback("X No Block found!", Color3.fromRGB(255,100,100)) return end
+    
+    for i, Block in ipairs(Blocks) do
+        task.spawn(function() ActiveRemote:InvokeServer(Block, Color3.fromRGB(R,G,B)) end)
+        if i % 500 == 0 then run.Heartbeat:Wait() end
+    end
+    StatusCallback(" Done • " .. #Blocks .. " Block", Color3.fromRGB(120, 255, 120))
+end
+
+function PainterLib.PaintImage(ActiveRemote, UrlText, StatusCallback)
+    if not ActiveRemote then StatusCallback("X Not connected", Color3.fromRGB(255,120,120)) return end
+    if UrlText == "" then StatusCallback("» Missing URL", Color3.fromRGB(255,180,80)) return end
+    
+    local Blocks = PainterLib.GetBlocks()
+    if #Blocks == 0 then StatusCallback("X No Block found!", Color3.fromRGB(255,100,100)) return end
+    
+    local rows = {}
+    for _, b in ipairs(Blocks) do
+        local y = math.floor(b.Position.Y + 0.5)
+        rows[y] = (rows[y] or 0) + 1
+    end
+    
+    local h, w = 0, 0
+    for _, count in pairs(rows) do
+        h = h + 1
+        if count > w then w = count end
+    end
+    
+    if w == 0 or h == 0 then StatusCallback("X Invalid grid size", Color3.fromRGB(255,100,100)) return end
+
+    StatusCallback("» Fetching image (" .. w .. "x" .. h .. ")...")
+    local Api = "https://pixel-api-l5ak.onrender.com/get_pixels?url=" .. HttpService:UrlEncode(UrlText) .. "&w=" .. w .. "&h=" .. h
+    local Success, Res = pcall(function() return game:HttpGet(Api) end)
+    
+    if not Success then StatusCallback("X Failed to fetch image", Color3.fromRGB(255,120,120)) return end
+    StatusCallback("...")
+    
+    local Pixels = HttpService:JSONDecode(Res)
+    
+    table.sort(Blocks, function(a, b)
+        if math.abs(a.Position.Y - b.Position.Y) > 0.5 then return a.Position.Y > b.Position.Y end
+        if math.abs(a.Position.X - b.Position.X) > 0.5 then return a.Position.X < b.Position.X end
+        return a.Position.Z < b.Position.Z
+    end)
+    
+    for i, Bl in ipairs(Blocks) do
+        if Pixels[i] then task.spawn(function() ActiveRemote:InvokeServer(Bl, Color3.fromRGB(Pixels[i][1], Pixels[i][2], Pixels[i][3])) end) end
+        if i % 500 == 0 then run.Heartbeat:Wait() end
+    end
+    StatusCallback(" Done • " .. math.min(#Blocks, #Pixels) .. " Block", Color3.fromRGB(120, 255, 120))
+end
+
+return PainterLib
