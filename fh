@@ -52,7 +52,7 @@ function PainterLib.PaintImage(ActiveRemote, UrlInputText, SetStatus)
     
     if w == 0 or h == 0 then SetStatus("X Invalid grid size", Color3.fromRGB(255,100,100)) return end
 
-    SetStatus("» Fetching image (" .. w .. "x" .. h .. ")...")
+    SetStatus("... (" .. w .. "x" .. h .. ")...")
     local Api = "https://pixel-api-l5ak.onrender.com/get_pixels?url=" .. HttpService:UrlEncode(UrlInputText) .. "&w=" .. w .. "&h=" .. h
     local Success, Res = pcall(function() return game:HttpGet(Api) end)
     
